@@ -1,0 +1,26 @@
+<view class="container">
+  <view class="status">
+    连接状态：{{connected ? '已连接' + deviceName : '未连接'}}
+  </view>
+
+  <!-- 显示参数变化 -->
+  <view class="parameter">
+    Theta/Beta 功率比：{{powerRatio !== null ? powerRatio : '未计算'}}
+  </view>
+
+  <canvas class="canvas" canvas-id="EEG" binderror="canvasIdErrorCallback" disable-scroll='true'></canvas>
+  <input 
+    class="input" 
+    placeholder="请输入十六进制数据（如：A1B2C3）" 
+    bindinput="handleInput" 
+    value="{{inputData}}"
+  />
+  
+  <button class="btn" bindtap="sendData">
+    发送数据
+  </button>
+  
+  <button class="btn" bindtap="navigateToScan">
+    {{connected ? '重新连接' : '搜索设备'}}
+  </button>
+</view>

@@ -287,15 +287,30 @@ def remove_eog_with_visualization(raw_signal, fs=250,Drawflag=0):
 
     # ===== 4. 信号校正 =====
     cleaned_eeg = raw_signal - eog_estimate
+
     # 端点修正(中值滤波)
     for seg in eog_segments:
         start, end = seg
-        # 前3点修正
-        if start > 2:
-            cleaned_eeg[start - 3:start] = signal.medfilt(cleaned_eeg[start - 5:start + 1], 5)[:3]
-        # 后3点修正
-        if end < len(cleaned_eeg) - 3:
-            cleaned_eeg[end:end + 3] = signal.medfilt(cleaned_eeg[end - 1:end + 6], 5)[-4:-1]
+
+        # 前3点修正 (确保有足够的数据点)
+        if start > 5:  # 需要至少5个点用于中值滤波
+            # 获取滤波区域
+            filter_region = cleaned_eeg[start - 5:start + 1]
+            # 应用中值滤波
+            filtered = signal.medfilt(filter_region, kernel_size=5)
+            # 确保获取到足够的数据点
+            if len(filtered) >= 3:
+                cleaned_eeg[start - 3:start] = filtered[:3]
+
+        # 后3点修正 (确保有足够的数据点)
+        if end < len(cleaned_eeg) - 6:  # 需要至少5个点用于中值滤波
+            # 获取滤波区域
+            filter_region = cleaned_eeg[end - 1:end + 6]
+            # 应用中值滤波
+            filtered = signal.medfilt(filter_region, kernel_size=5)
+            # 确保获取到足够的数据点
+            if len(filtered) >= 4:
+                cleaned_eeg[end:end + 3] = filtered[-4:-1]
 
     if (Drawflag == 1):
         # 最终结果可视化
@@ -325,28 +340,28 @@ def low_freq_compensation(Insignal,eog_estimate, fs=250):
     return low_comp * np.clip(comp_scale, 0.05, 0.2)
 
 
-fs = 250
-window_size = 2* fs  # 2秒窗长
-eeg = np.loadtxt('凝胶3.txt')
-# 分窗处理
-num_windows = len(eeg) // window_size
-all_cleaned = []
-all_eog = []
-seg = []
-plt.figure(figsize=(12, 8))
-for i in range(num_windows):
-    start = i * window_size
-    end = start + window_size
-    seg = eeg[start:end]
-    seg = preprocess(seg)
-    cleaned, eog = remove_eog_with_visualization(seg,250,0)
-    all_cleaned.extend(cleaned)
-    all_eog.extend(eog)
-    # 绘制每个窗口
-    plt.subplot(num_windows, 1, i + 1)
-    plt.plot(seg, 'b', label='Original', alpha=0.5)
-    plt.plot(cleaned, 'r', label='Cleaned')
-    plt.legend()
-plt.title("Gel 3")
-plt.tight_layout()
-plt.show()
+# fs = 250
+# window_size = 2* fs  # 2秒窗长
+# eeg = np.loadtxt('凝胶3.txt')
+# # 分窗处理
+# num_windows = len(eeg) // window_size
+# all_cleaned = []
+# all_eog = []
+# seg = []
+# plt.figure(figsize=(12, 8))
+# for i in range(num_windows):
+#     start = i * window_size
+#     end = start + window_size
+#     seg = eeg[start:end]
+#     seg = preprocess(seg)
+#     cleaned, eog = remove_eog_with_visualization(seg,250,0)
+#     all_cleaned.extend(cleaned)
+#     all_eog.extend(eog)
+#     # 绘制每个窗口
+#     plt.subplot(num_windows, 1, i + 1)
+#     plt.plot(seg, 'b', label='Original', alpha=0.5)
+#     plt.plot(cleaned, 'r', label='Cleaned')
+#     plt.legend()
+# plt.title("Gel 3")
+# plt.tight_layout()
+# plt.show()

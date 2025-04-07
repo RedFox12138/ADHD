@@ -1,4 +1,7 @@
 import os
+import sys
+#python库的路径
+sys.path.append('D:\\anaconda\\lib\\site-packages')
 import threading
 import collections
 from flask import Flask, request, jsonify
@@ -8,6 +11,9 @@ from matplotlib.animation import FuncAnimation
 import datetime  # 用于生成时间戳
 
 from sphinx.util import requests
+
+# 假设这里是你已经实现的预处理函数
+from PreProcess import preprocess, preprocess1
 
 app = Flask(__name__)
 
@@ -66,23 +72,23 @@ def process_data():
         return jsonify({"error": "userId is required"}), 400
 
     # 调用预处理函数
-    # processed_points, tbr = preprocess(points, fs)
-    tbr=1
+    processed_points, tbr = preprocess1(points, fs)
+
     # 获取当前会话的文件路径
     raw_file, processed_file = get_user_session(user_id)
 
     # 将新收到的数据追加到队列
     raw_data_buffer.extend(points)
-    # processed_data_buffer.extend(processed_points)
+    processed_data_buffer.extend(processed_points)
 
     # 写入文件
     with open(raw_file, 'a') as f:
         for p in points:
             f.write(f"{p}\n")
 
-    # with open(processed_file, 'a') as f:
-    #     for pp in processed_points:
-    #         f.write(f"{pp}\n")
+    with open(processed_file, 'a') as f:
+        for pp in processed_points:
+            f.write(f"{pp}\n")
 
     return jsonify({
         "status": "success",

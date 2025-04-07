@@ -37,7 +37,7 @@ def preprocess1(OriginalSignal, fs=250):
     beta_band = [13,30]
     power_ratio = compute_power_ratio(d1, fs, theta_band, beta_band)
 
-    return d1
+    return d1,power_ratio
 
 
 def preprocess(raw_signal, fs=250, visualize=False):

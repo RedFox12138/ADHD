@@ -53,7 +53,7 @@ Page({
           if (res.code) {
             // 将 code 发送到后端，获取 user_id
             wx.request({
-              url: 'http://7809sk6421.zicp.fun:47409/getOpenId', // 替换为你的服务器地址
+              url: 'http://4nbsf9900182.vicp.fun/getOpenId', // 替换为你的服务器地址
               method: 'POST',
               data: {
                 code: res.code
@@ -132,7 +132,7 @@ Page({
       receivedData = receivedData.slice(batch_len); // 剩余的数组
   
       wx.request({
-        url: 'http://7809sk6421.zicp.fun:47409/process', 
+        url: 'http://4nbsf9900182.vicp.fun/process', 
         method: 'POST',
         data: {
           points: dataToSend, // 发送前 1000 个点

@@ -1,97 +1,124 @@
 import sys
 
-import pywt
-from sympy.abc import alpha
-
 from PlotFreq import PlotFreq
-from Wavelet import wavelet_decomposition, compute_frequency_ranges, ewt_decomposition
+from PreProcess import preprocess, preprocess1
+from SingleDenoise import remove_eog_with_visualization
 
 #python库的路径
 sys.path.append('D:\\anaconda\\lib\\site-packages')
-import matplotlib.pyplot as plt
 import numpy as np
-from PreProcess import preprocess, perform_ceemdan, plot_imfs, perform_ceemdan_ica_denoising, preprocess1
-from scipy.signal import cheby2, filtfilt, welch
-# data = []
-# with open('D:\\pycharm Project\\WX\\data\\oksQL7aHWZ0qkXkFP-oC05eZugE8\\raw_20250324_094828_076.txt', 'r', encoding='utf-8') as file:
-#     for line in file:
-#         values = line.strip().split()  # 去掉换行符并按空格分割
-#         data.append(float(values))  # 打印分割后的列表
+import matplotlib.pyplot as plt
+from scipy import signal
+import numpy as np
+from scipy import signal
+import matplotlib.pyplot as plt
 
-# data1 = np.loadtxt('data/oksQL7aHWZ0qkXkFP-oC05eZugE8/0327橙色眨眼1.txt', dtype=np.float32)
-# data2 = np.loadtxt('D:\\pycharm Project\\WX\\data\\oksQL7aHWZ0qkXkFP-oC05eZugE8\\干电极2.txt',dtype=np.float32)
-# data3 = np.loadtxt('D:\\pycharm Project\\WX\\data\\oksQL7aHWZ0qkXkFP-oC05eZugE8\\凝胶1.txt',dtype=np.float32)
-# data4 = np.loadtxt('D:\\pycharm Project\\WX\\data\\oksQL7aHWZ0qkXkFP-oC05eZugE8\\凝胶2.txt',dtype=np.float32)
-#
-# data1 = np.array(data1).flatten()
-# data2 = np.array(data2).flatten()
-# data3 = np.array(data3).flatten()
-# data4 = np.array(data4).flatten()
+# 定义频段
+BANDS = ['delta', 'theta', 'alpha', 'beta']
+BAND_RANGES = {
+    'delta': (0.5, 4),
+    'theta': (3, 11),
+    'alpha': (8, 13),
+    'beta': (10, 36)
+}
 
 
-# plt.figure()
-# plt.subplot(4, 1, 1)
-# plt.plot(data1)
-# plt.subplot(4, 1, 2)
-# plt.plot(data2)
-# plt.subplot(4, 1, 3)
-# plt.plot(data3)
-# plt.subplot(4, 1, 4)
-# plt.plot(data4)
-# plt.show()
-
-fs=250
-data = np.loadtxt('凝胶2.txt', dtype=np.float32)
+def design_cheby2_bandpass(lowcut, highcut, fs, order=5, rs=40):
+    """设计切比雪夫II型带通滤波器"""
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = signal.cheby2(order, rs, [low, high], btype='band')
+    return b, a
 
 
+def compute_band_power(data, band, fs):
+    """计算特定频段的功率"""
+    lowcut, highcut = BAND_RANGES[band]
+    b, a = design_cheby2_bandpass(lowcut, highcut, fs)
+    # 应用滤波器
+    filtered_data = signal.filtfilt(b, a, data)
+    # if(band=="beta"):
+    #     PlotFreq(data, 250)
+    #     PlotFreq(filtered_data,250)
+    #     plt.show()
+    # 计算功率 (μV²)
+    power = np.mean(filtered_data **  2)
+    return power
 
-window_size = 2* fs  # 2秒窗长
 
-# 加载数据a1
-eeg = np.loadtxt('凝胶2.txt')
+def compute_band_powers(data):
+    """计算所有频段的功率"""
+    powers = {}
+    for band in BANDS:
+        powers[band] = compute_band_power(data, band, fs)
+
+    # 计算theta/beta比值
+    powers['theta_beta_ratio'] = powers['theta'] / powers['beta'] if powers['beta'] > 0 else 0
+
+    return powers
+
+
+# 加载数据
+eeg = np.loadtxt('D:\\Pycharm_Projects\\ADHD\\data\\oksQL7aHWZ0qkXkFP-oC05eZugE8\\0406Game04凝胶.txt')
+fs = 250  # 采样率
+window_size = fs * 2  # 2秒窗口（500个点）
 
 # 分窗处理
 num_windows = len(eeg) // window_size
-all_cleaned = []
-all_eog = []
+band_power_history = {band: [] for band in BANDS}
+band_power_history['theta_beta_ratio'] = []
 
-plt.figure(figsize=(12, 8))
 for i in range(num_windows):
-    start = i * window_size
-    end = start + window_size
-    seg = eeg[start:end]
-    seg = preprocess(seg)
-    cleaned = seg
-    all_cleaned.extend(cleaned)
-    # 绘制每个窗口
-    plt.subplot(num_windows, 1, i + 1)
-    plt.plot(seg, 'b', label='Original', alpha=0.5)
-    plt.plot(cleaned, 'r', label='Cleaned')
-    plt.legend()
+    seg = eeg[i * window_size: (i + 1) * window_size]
+    # plt.figure()
+    seg= preprocess(seg,250)[20:-20]
+    # plt.plot(seg)
+    # seg,_ = remove_eog_with_visualization(seg,250,0)
+    # plt.plot(seg)
+    # plt.show()
 
+    powers = compute_band_powers(seg)
 
+    # 存储结果
+    for band in BANDS:
+        band_power_history[band].append(powers[band])
+    band_power_history['theta_beta_ratio'].append(powers['theta_beta_ratio'])
 
-processed_points = preprocess(data, fs)
+# 可视化结果（5个子图垂直排列）
+plt.figure(figsize=(12, 12))
+colors = {'delta': 'blue', 'theta': 'green', 'alpha': 'orange', 'beta': 'red'}
+
+# 绘制各频段功率
+for i, band in enumerate(BANDS):
+    plt.subplot(5, 1, i + 1)
+    plt.plot(band_power_history[band], '.-', color=colors[band])
+    plt.ylabel(f'{band} power (μV²)')
+    plt.title(f'{band} band ({BAND_RANGES[band][0]}-{BAND_RANGES[band][1]}Hz) power')
+    plt.grid(True)
+
+# 添加θ/β比值到最后一个子图
+# 添加θ/β比值到最后一个子图
 plt.figure()
-# plt.subplot(2,1,1)
-# plt.plot(all_cleaned,label='Processed by Windows', color='red')
-# plt.plot(processed_points,label='Processed by All', color='blue')
+x = np.arange(len(band_power_history['theta_beta_ratio']))
+y = band_power_history['theta_beta_ratio']
 
-# plt.subplot(2,1,2)
-ax = PlotFreq(data, fs=fs, label='Raw', color='red')
-# # 绘制预处理信号频谱（红色）
-PlotFreq(processed_points, fs=fs, label='Processed', color='blue', ax=ax)
-plt.legend(loc='upper right')
-# plt.grid(True, linestyle='--', alpha=0.5)
+# 绘制原始数据点
+plt.plot(x, y, 'm.-', label='θ/β ratio')
+
+# 计算并绘制拟合线（使用3阶多项式拟合）
+if len(x) > 3:  # 确保有足够的数据点进行拟合
+    coeffs = np.polyfit(x, y, 3)
+    poly = np.poly1d(coeffs)
+    y_fit = poly(x)
+    plt.plot(x, y_fit, 'b-', linewidth=2, label='Thrend')
+
+
+plt.ylabel('θ/β ratio')
+plt.xlabel('Windows (time/2s)')
+plt.title('Theta/Beta ratio')
+plt.legend()
+plt.grid(True)
+
 plt.tight_layout()
 plt.show()
-
-
-
-
-
-
-
-
-
-
